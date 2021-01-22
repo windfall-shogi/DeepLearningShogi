@@ -137,3 +137,12 @@ class PolicyValueNetwork(nn.Module):
             memory_efficient (bool): Whether to use memory-efficient version of swish.
         """
         self.swish = nn.SiLU() if memory_efficient else Swish()
+
+class PolicyValueNetworkAddSigmoid(PolicyValueNetwork):
+    def __init__(self):
+        super(PolicyValueNetworkAddSigmoid, self).__init__()
+        super(PolicyValueNetworkAddSigmoid, self).set_swish(False)
+
+    def __call__(self, x1, x2):
+        y1, y2 = super(PolicyValueNetworkAddSigmoid, self).__call__(x1, x2)
+        return y1, torch.sigmoid(y2)

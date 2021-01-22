@@ -1,5 +1,6 @@
 ﻿import torch.onnx
 import torch.nn.functional as F
+import re
 
 from dlshogi.common import *
 from dlshogi import serializers
@@ -10,7 +11,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('model')
 parser.add_argument('onnx')
 parser.add_argument('--gpu', '-g', type=int, default=0, help='GPU ID')
-parser.add_argument('--network', type=str, default='wideresnet10', choices=['wideresnet10', 'wideresnet15', 'senet10', 'resnet10_swish', 'resnet20_swish'])
+parser.add_argument('--network', type=str, default='wideresnet10', help='network type')
 parser.add_argument('--fixed_batchsize', type=int)
 args = parser.parse_args()
 
@@ -21,28 +22,27 @@ else:
     device = torch.device("cpu")
 
 if args.network == 'wideresnet10':
-    from dlshogi.policy_value_network import *
+    from dlshogi.policy_value_network import PolicyValueNetworkAddSigmoid
+    model = PolicyValueNetworkAddSigmoid()
 elif args.network == 'wideresnet15':
-    from dlshogi.policy_value_network_wideresnet15 import *
+    from dlshogi.policy_value_network_wideresnet15 import PolicyValueNetworkAddSigmoid
+    model = PolicyValueNetworkAddSigmoid()
 elif args.network == 'senet10':
-    from dlshogi.policy_value_network_senet10 import *
+    from dlshogi.policy_value_network_senet10 import PolicyValueNetworkAddSigmoid
+    model = PolicyValueNetworkAddSigmoid()
 elif args.network == 'resnet10_swish':
-    from dlshogi.policy_value_network_resnet10_swish import *
+    from dlshogi.policy_value_network_resnet10_swish import PolicyValueNetworkAddSigmoid
+    model = PolicyValueNetworkAddSigmoid()
 elif args.network == 'resnet20_swish':
-    from dlshogi.policy_value_network_resnet20_swish import *
-baseclass = PolicyValueNetwork
+    from dlshogi.policy_value_network_resnet20_swish import PolicyValueNetworkAddSigmoid
+    model = PolicyValueNetworkAddSigmoid()
+elif re.fullmatch(r'resnet(?:\d+)ch(?:\d+)_(?:relu|swish|mish|tanhexp)', args.network):
+    from dlshogi.policy_value_network_resnet_b import getPolicyValueNetworkAddSigmoid
+    model = getPolicyValueNetworkAddSigmoid(args.network)
+else:
+    from dlshogi.policy_value_network import PolicyValueNetworkAddSigmoid
+    model = PolicyValueNetworkAddSigmoid()
 
-class PolicyValueNetworkAddSigmoid(baseclass):
-    def __init__(self):
-        super(PolicyValueNetworkAddSigmoid, self).__init__()
-
-    def __call__(self, x1, x2):
-        y1, y2 = super(PolicyValueNetworkAddSigmoid, self).__call__(x1, x2)
-        return y1, torch.sigmoid(y2)
-
-model = PolicyValueNetworkAddSigmoid()
-if args.network.endswith('_swish'):
-    model.set_swish(False)
 model.to(device)
 
 serializers.load_npz(args.model, model)
