@@ -30,11 +30,14 @@
     <Compile Include="common.py">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="activations_autofn.py" />
     <Compile Include="convert_model_to_onnx.py" />
     <Compile Include="policy_value_network.py" />
     <Compile Include="policy_value_network_resnet10_swish.py" />
     <Compile Include="policy_value_network_resnet20_swish.py" />
+    <Compile Include="policy_value_network_resnet_b.py" />
     <Compile Include="policy_value_network_senet10.py" />
+    <Compile Include="policy_value_network_wideresenet15.py" />
     <Compile Include="serializers.py">
       <SubType>Code</SubType>
     </Compile>

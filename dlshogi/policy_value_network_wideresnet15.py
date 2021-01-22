@@ -170,3 +170,11 @@ class PolicyValueNetwork(nn.Module):
         h32_v = F.relu(self.norm32_v(self.l32_v(h31)))
         h33_v = F.relu(self.l33_v(h32_v.view(-1, 9*9*MAX_MOVE_LABEL_NUM)))
         return h32_1, self.l34_v(h33_v)
+
+class PolicyValueNetworkAddSigmoid(PolicyValueNetwork):
+    def __init__(self):
+        super(PolicyValueNetworkAddSigmoid, self).__init__()
+
+    def __call__(self, x1, x2):
+        y1, y2 = super(PolicyValueNetworkAddSigmoid, self).__call__(x1, x2)
+        return y1, torch.sigmoid(y2)

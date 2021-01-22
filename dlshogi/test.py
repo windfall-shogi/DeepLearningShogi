@@ -10,6 +10,7 @@ from dlshogi import cppshogi
 import argparse
 import random
 import os
+import re
 
 import logging
 
@@ -17,7 +18,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('model', type=str, default='model', help='model file name')
 parser.add_argument('test_data', type=str, help='test data file')
 parser.add_argument('--testbatchsize', type=int, default=640, help='Number of positions in each test mini-batch')
-parser.add_argument('--network', type=str, default='wideresnet10', choices=['wideresnet10', 'wideresnet15', 'senet10', 'resnet10_swish', 'resnet20_swish'], help='network type')
+parser.add_argument('--network', type=str, default='wideresnet10', help='network type')
 parser.add_argument('--log', default=None, help='log file path')
 parser.add_argument('--val_lambda', type=float, default=0.333, help='regularization factor')
 parser.add_argument('--gpu', '-g', type=int, default=0, help='GPU ID')
@@ -25,14 +26,22 @@ args = parser.parse_args()
 
 if args.network == 'wideresnet15':
     from dlshogi.policy_value_network_wideresnet15 import *
+    model = PolicyValueNetwork()
 elif args.network == 'senet10':
     from dlshogi.policy_value_network_senet10 import *
+    model = PolicyValueNetwork()
 elif args.network == 'resnet10_swish':
     from dlshogi.policy_value_network_resnet10_swish import *
+    model = PolicyValueNetwork()
 elif args.network == 'resnet20_swish':
     from dlshogi.policy_value_network_resnet20_swish import *
+    model = PolicyValueNetwork()
+elif re.fullmatch(r'resnet(?:\d+)ch(?:\d+)_(?:relu|swish|mish|tanhexp)', args.network):
+    from dlshogi.policy_value_network_resnet_b import *
+    model = getPolicyValueNetwork(args.network)
 else:
     from dlshogi.policy_value_network import *
+    model = PolicyValueNetwork()
 
 logging.basicConfig(format='%(asctime)s\t%(levelname)s\t%(message)s', datefmt='%Y/%m/%d %H:%M:%S', filename=args.log, level=logging.DEBUG)
 
@@ -42,7 +51,6 @@ if args.gpu >= 0:
 else:
     device = torch.device("cpu")
 
-model = PolicyValueNetwork()
 model.to(device)
 
 cross_entropy_loss = torch.nn.CrossEntropyLoss(reduction='none')
