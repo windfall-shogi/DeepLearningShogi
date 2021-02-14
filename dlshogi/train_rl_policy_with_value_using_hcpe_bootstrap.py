@@ -2,7 +2,7 @@
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
-
+from tqdm import tqdm
 from dlshogi.common import *
 from dlshogi import serializers
 from dlshogi.swa import SWA
