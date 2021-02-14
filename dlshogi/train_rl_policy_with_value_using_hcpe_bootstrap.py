@@ -2,7 +2,7 @@
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
-
+from tqdm import tqdm
 from dlshogi.common import *
 from dlshogi import serializers
 from dlshogi.swa import SWA
@@ -167,7 +167,7 @@ for e in range(args.epoch):
     sum_loss2_epoch = 0
     sum_loss3_epoch = 0
     sum_loss_epoch = 0
-    for i in range(0, len(train_data) - args.batchsize + 1, args.batchsize):
+    for i in tqdm(range(0, len(train_data) - args.batchsize + 1, args.batchsize), desc='train'):
         if args.use_amp:
             amp_context = torch.cuda.amp.autocast()
             amp_context.__enter__()
@@ -258,7 +258,7 @@ for e in range(args.epoch):
     sum_test_entropy2 = 0
     model.eval()
     with torch.no_grad():
-        for i in range(0, len(test_data) - args.testbatchsize, args.testbatchsize):
+        for i in tqdm(range(0, len(test_data) - args.testbatchsize, args.testbatchsize), desc='test'):
             x1, x2, t1, t2, z, value = mini_batch(test_data[i:i+args.testbatchsize])
             y1, y2 = model(x1, x2)
 
