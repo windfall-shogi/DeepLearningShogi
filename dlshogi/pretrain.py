@@ -145,16 +145,16 @@ class PositionPairDataset(Dataset):
             kif = self.record_list[idx]
             n = len(kif.moves)
 
-        i = random.randint(4, n - 4)
+        i = random.randint(0, n - 9)
+        j = i + random.choice((2, 4, 6, 8))
+        early = 0.0
         if random.random() < 0.5:
-            j = random.randrange(i % 2, i, 2)
-        else:
-            j = random.randrange(i + 2, n, 2)
+            i, j = j, i
+            early = 1.0
 
         count = 0
         feature1a, feature2a, feature1b, feature2b = None, None, None, None
         result = None
-        early = 0.0 if i < j else 1.0
         for k, move in enumerate(kif.moves):
             if i == k:
                 result, feature1a, feature1b = self.make_input_feature(kif.win)
