@@ -30,6 +30,7 @@ def parse_args():
     parser.add_argument('--csa_dir', type=str)
     parser.add_argument('--model_path', type=str)
     parser.add_argument('--batch_size', type=int, default=100)
+    parser.add_argument('--pre_act', action='store_true')
     args = parser.parse_args()
     return args
 
@@ -209,7 +210,7 @@ def main():
     if args.model_path is not None:
         model = FeatureNetwork.load_from_checkpoint(args.model_path)
     else:
-        model = FeatureNetwork(blocks=20, channels=256, pre_act=False)
+        model = FeatureNetwork(blocks=20, channels=256, pre_act=args.pre_act)
     checkpoint = pl.callbacks.ModelCheckpoint(
         dirpath=str(output_dir), monitor='val_loss',
         filename='pl-{epoch:02d}-{val_loss:.2f}',
