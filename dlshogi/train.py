@@ -1,32 +1,24 @@
 #! /usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import re
-import random
-import os
-from pathlib import Path
 import argparse
+import re
+from pathlib import Path
 from typing import Any, List
 
 import numpy as np
-import torch
-from torch import nn
-import torch.nn.functional as F
-from torchvision import transforms
-from torch.utils.data import DataLoader, random_split, Dataset
 import pytorch_lightning as pl
-from pytorch_lightning.metrics.functional import accuracy
+import torch
+import torch.nn.functional as F
+from torch import nn
+# noinspection PyProtectedMember
+from torch.utils.data import DataLoader, Dataset
+
 import cshogi
 import cppshogi
-from cshogi import CSA
-from tqdm import tqdm
-from torch.optim.swa_utils import AveragedModel, SWALR
-from torch.optim.lr_scheduler import CosineAnnealingLR
-
 from dlshogi.common import FEATURES1_NUM, FEATURES2_NUM
-from dlshogi.network.resnet import NetworkBase
-from dlshogi.pretrain import FeatureNetwork
 from dlshogi.network.policy_value import PolicyValueNetwork
+from dlshogi.pretrain import FeatureNetwork
 
 __author__ = 'Yasuhiro'
 __date__ = '2021/02/21'
@@ -65,16 +57,15 @@ def copy_pretrained_value(pretrained_model_path, model):
 
 
 class Network(pl.LightningModule):
+    # noinspection PyUnusedLocal
     def __init__(self, blocks, channels, features, pre_act=False,
-                 activation=nn.SiLU, beta=0, val_lambda=0.333, swa_freq=250,
-                 swa_n_avr=10, swa_lr=0.01):
+                 activation=nn.SiLU, beta=0, val_lambda=0.333):
         super(Network, self).__init__()
         self.save_hyperparameters()
 
         self.net = PolicyValueNetwork(blocks=blocks, channels=channels,
                                       features=features, pre_act=pre_act,
                                       activation=activation)
-        # self.swa_model = AveragedModel(self.net)
 
         self.ce = nn.CrossEntropyLoss(reduction='none')
         self.bce = nn.BCEWithLogitsLoss()
@@ -155,14 +146,6 @@ class Network(pl.LightningModule):
                 self.train_metrics[key].reset()
             else:
                 self.train_metrics[key] = 0
-
-        # if self.trainer.current_epoch > self.swa_start:
-        #     self.swa_model.update_parameters(self.net)
-        #     self.swa_scheduler.step()
-        #     torch.optim.swa_utils.update_bn(self.train_dataloader(),
-        #                                     self.swa_model)
-        # else:
-        #     self.scheduler.step()
 
     def validation_step(self, batch, batch_idx):
         x1, x2, t1, t2, z, value = batch
@@ -273,11 +256,6 @@ class Network(pl.LightningModule):
     # noinspection PyAttributeOutsideInit
     def configure_optimizers(self):
         optimizer = torch.optim.SGD(self.parameters(), lr=0.01)
-        # self.scheduler = CosineAnnealingLR(optimizer, T_max=100)
-        # self.swa_scheduler = SWALR(
-        #     optimizer, swa_lr=self.swa_lr, anneal_epochs=self.swa_freq,
-        #     anneal_strategy='linear'
-        # )
         return optimizer
 
 
