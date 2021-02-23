@@ -159,7 +159,8 @@ class Network(pl.LightningModule):
         loss = (loss1 + (1 - self.hparams.val_lambda) * loss2 +
                 self.hparams.val_lambda * loss3)
 
-        entropy1 = F.softmax(y1, dim=1) * F.log_softmax(y1, dim=1)
+        entropy1 = (-F.softmax(y1, dim=1) *
+                    F.log_softmax(y1, dim=1)).sum(dim=1)
         p2 = y2.sigmoid()
         log1p_ey2 = F.softplus(y2)
         entropy2 = -(p2 * (y2 - log1p_ey2) + (1 - p2) * -log1p_ey2)
@@ -212,7 +213,8 @@ class Network(pl.LightningModule):
         loss = (loss1 + (1 - self.hparams.val_lambda) * loss2 +
                 self.hparams.val_lambda * loss3)
 
-        entropy1 = F.softmax(y1, dim=1) * F.log_softmax(y1, dim=1)
+        entropy1 = (-F.softmax(y1, dim=1) *
+                    F.log_softmax(y1, dim=1)).sum(dim=1)
         p2 = y2.sigmoid()
         log1p_ey2 = F.softplus(y2)
         entropy2 = -(p2 * (y2 - log1p_ey2) + (1 - p2) * -log1p_ey2)
