@@ -255,7 +255,7 @@ class Network(pl.LightningModule):
 
     # noinspection PyAttributeOutsideInit
     def configure_optimizers(self):
-        optimizer = torch.optim.SGD(self.parameters(), lr=0.01)
+        optimizer = torch.optim.SGD(self.parameters(), lr=0.001)
         return optimizer
 
 
@@ -339,10 +339,11 @@ def main():
         filename='pl-{epoch:02d}-{val_loss:.2f}',
         save_top_k=3, mode='min'
     )
-    trainer = pl.Trainer(callbacks=[checkpoint], max_epochs=2, gpus=[0],
-                         default_root_dir=str(output_dir),
-                         stochastic_weight_avg=True,
-                         fast_dev_run=args.fast_dev_run)
+    trainer = pl.Trainer(
+        callbacks=[checkpoint], max_epochs=2, gpus=[0],
+        default_root_dir=str(output_dir), stochastic_weight_avg=True,
+        fast_dev_run=args.fast_dev_run, val_check_interval=0.1
+    )
     trainer.fit(model, train_dataloader=train_loader,
                 val_dataloaders=val_loader)
     metrics = trainer.test(model, test_dataloaders=test_loader)
