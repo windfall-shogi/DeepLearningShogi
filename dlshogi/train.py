@@ -32,11 +32,15 @@ def parse_args():
     parser.add_argument('--test_data', type=str)
     parser.add_argument('--model_path', type=str)
     parser.add_argument('--pretrained_model_path', type=str)
+    parser.add_argument('--epoch', type=int, default=1)
     parser.add_argument('--batch_size', type=int, default=100)
+    parser.add_argument('--eval_interval', type=int, default=1000,
+                        help='frequency (steps) to check validation')
     parser.add_argument('--pre_act', action='store_true')
+    parser.add_argument('--lr', type=float, default=1e-3)
     parser.add_argument('--swa_freq', type=int, default=250)
     parser.add_argument('--swa_n_avr', type=int, default=10)
-    parser.add_argument('--swa_lr', type=float)
+    parser.add_argument('--swa_lr', type=float, default=1e-3)
     parser.add_argument('--fast_dev_run', action='store_true')
     args = parser.parse_args()
     return args
@@ -59,7 +63,7 @@ def copy_pretrained_value(pretrained_model_path, model):
 class Network(pl.LightningModule):
     # noinspection PyUnusedLocal
     def __init__(self, blocks, channels, features, pre_act=False,
-                 activation=nn.SiLU, beta=0, val_lambda=0.333):
+                 activation=nn.SiLU, beta=0, val_lambda=0.333, lr=1e-2):
         super(Network, self).__init__()
         self.save_hyperparameters()
 
@@ -257,7 +261,7 @@ class Network(pl.LightningModule):
 
     # noinspection PyAttributeOutsideInit
     def configure_optimizers(self):
-        optimizer = torch.optim.SGD(self.parameters(), lr=0.001)
+        optimizer = torch.optim.SGD(self.parameters(), lr=self.hparams.lr)
         return optimizer
 
 
@@ -341,10 +345,21 @@ def main():
         filename='pl-{epoch:02d}-{val_loss:.2f}',
         save_top_k=3, mode='min'
     )
+    swa = pl.callbacks.swa.StochasticWeightAveraging(
+        swa_epoch_start=args.swa_freq, swa_lrs=args.lr
+    )
+    # 1 epochあたりのバッチ数を制限するので、全体のエポック数を調整
+    epochs = (len(train_dataset) + args.swa_freq - 1) // args.swa_freq
+    max_epochs = args.epoch * epochs
+    # validation dataを評価する頻度も調整
+    interval = (args.eval_interval + args.swa_freq - 1) // args.swa_freq
     trainer = pl.Trainer(
-        callbacks=[checkpoint], max_epochs=2, gpus=[0],
+        callbacks=[checkpoint, swa], max_epochs=max_epochs, gpus=[0],
         default_root_dir=str(output_dir), stochastic_weight_avg=True,
-        fast_dev_run=args.fast_dev_run, val_check_interval=0.1
+        fast_dev_run=args.fast_dev_run,
+        # 1 epochあたりのバッチ数を制限して、epoch終了時のSWAの処理を実行させる
+        limit_train_batches=args.swa_freq,
+        val_check_interval=interval
     )
     trainer.fit(model, train_dataloader=train_loader,
                 val_dataloaders=val_loader)
