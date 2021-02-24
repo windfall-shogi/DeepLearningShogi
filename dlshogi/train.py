@@ -361,7 +361,7 @@ def main():
         precision=16 if args.use_amp else 32,
         # 1 epochあたりのバッチ数を制限して、epoch終了時のSWAの処理を実行させる
         limit_train_batches=args.swa_freq,
-        val_check_interval=interval
+        check_val_every_n_epoch=interval
     )
     trainer.fit(model, train_dataloader=train_loader,
                 val_dataloaders=val_loader)
