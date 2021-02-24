@@ -41,6 +41,7 @@ def parse_args():
     parser.add_argument('--swa_freq', type=int, default=250)
     parser.add_argument('--swa_n_avr', type=int, default=10)
     parser.add_argument('--swa_lr', type=float, default=1e-3)
+    parser.add_argument('--use_amp', action='store_true')
     parser.add_argument('--fast_dev_run', action='store_true')
     args = parser.parse_args()
     return args
@@ -357,6 +358,7 @@ def main():
         callbacks=[checkpoint, swa], max_epochs=max_epochs, gpus=[0],
         default_root_dir=str(output_dir), stochastic_weight_avg=True,
         fast_dev_run=args.fast_dev_run,
+        precision=16 if args.use_amp else 32,
         # 1 epochあたりのバッチ数を制限して、epoch終了時のSWAの処理を実行させる
         limit_train_batches=args.swa_freq,
         val_check_interval=interval
