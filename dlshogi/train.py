@@ -334,7 +334,8 @@ def main():
     if args.model_path is not None:
         model = Network.load_from_checkpoint(args.model_path)
     else:
-        model = Network(blocks=20, channels=256, features=256, pre_act=False)
+        model = Network(blocks=20, channels=256, features=256,
+                        pre_act=args.pre_act)
         if args.pretrained_model_path is not None:
             copy_pretrained_value(
                 pretrained_model_path=args.pretrained_model_path,
@@ -350,8 +351,10 @@ def main():
         swa_epoch_start=args.swa_freq, swa_lrs=args.lr
     )
     # 1 epochあたりのバッチ数を制限するので、全体のエポック数を調整
-    epochs = (len(train_dataset) + args.swa_freq - 1) // args.swa_freq
+    n = args.swa_freq * args.batch_size
+    epochs = (len(train_dataset) + n - 1) // n
     max_epochs = args.epoch * epochs
+    print('max epochs:', max_epochs)
     # validation dataを評価する頻度も調整
     interval = (args.eval_interval + args.swa_freq - 1) // args.swa_freq
     trainer = pl.Trainer(
