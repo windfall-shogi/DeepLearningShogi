@@ -65,7 +65,8 @@ def copy_pretrained_value(pretrained_model_path, model):
 class Network(pl.LightningModule):
     # noinspection PyUnusedLocal
     def __init__(self, blocks, channels, features, pre_act=False,
-                 activation=nn.SiLU, beta=0, val_lambda=0.333, lr=1e-2):
+                 activation=nn.SiLU, beta=0, val_lambda=0.333, lr=1e-2,
+                 swa_freq=250):
         super(Network, self).__init__()
         self.save_hyperparameters()
 
@@ -110,9 +111,11 @@ class Network(pl.LightningModule):
 
         return loss
 
-    def training_epoch_end(self, outputs: List[Any]) -> None:
-        self.swa_model.update_parameters(self.net)
-        self.swa_scheduler.step()
+    def on_train_batch_end(self, outputs: Any, batch: Any, batch_idx: int,
+                           dataloader_idx: int) -> None:
+        if (batch_idx + 1) % self.hparams.swa_freq == 0:
+            self.swa_model.update_parameters(self.net)
+            self.swa_scheduler.step()
 
     def validation_step(self, batch, batch_idx):
         x1, x2, t1, t2, z, value = batch
@@ -261,7 +264,7 @@ def main():
     test_data = np.fromfile(args.test_data,
                             dtype=cshogi.HuffmanCodedPosAndEval)
     train_dataset = HCPEDataset(data=train_data)
-    val_dataset = HCPEDataset(data=test_data[:1000])
+    val_dataset = HCPEDataset(data=test_data[:args.batch_size * 10])
     test_dataset = HCPEDataset(data=test_data)
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size,
                               shuffle=True)
@@ -278,7 +281,7 @@ def main():
         model = Network.load_from_checkpoint(args.model_path)
     else:
         model = Network(blocks=20, channels=256, features=256,
-                        pre_act=args.pre_act)
+                        pre_act=args.pre_act, swa_freq=args.swa_freq)
         if args.pretrained_model_path is not None:
             copy_pretrained_value(
                 pretrained_model_path=args.pretrained_model_path,
@@ -290,25 +293,12 @@ def main():
         filename='pl-{epoch:02d}-{val_loss:.2f}',
         save_top_k=3, mode='min'
     )
-    swa = pl.callbacks.swa.StochasticWeightAveraging(
-        swa_epoch_start=1, swa_lrs=args.lr
-    )
-    # 1 epochあたりのバッチ数を制限するので、全体のエポック数を調整
-    n = args.swa_freq * args.batch_size
-    # epochs = (len(train_dataset) + n - 1) // n
-    epochs = 3
-    max_epochs = args.epoch * epochs
-    print('max epochs:', max_epochs)
-    # validation dataを評価する頻度も調整
-    interval = (args.eval_interval + args.swa_freq - 1) // args.swa_freq
     trainer = pl.Trainer(
-        callbacks=[checkpoint], max_epochs=max_epochs, gpus=[1],
-        default_root_dir=str(output_dir), stochastic_weight_avg=False,
+        callbacks=[checkpoint], max_epochs=args.epoch, gpus=[0],
+        default_root_dir=str(output_dir),
         fast_dev_run=args.fast_dev_run,
         precision=16 if args.use_amp else 32,
-        # 1 epochあたりのバッチ数を制限して、epoch終了時のSWAの処理を実行させる
-        limit_train_batches=args.swa_freq,
-        check_val_every_n_epoch=interval
+        val_check_interval=args.eval_interval
     )
     trainer.fit(model, train_dataloader=train_loader,
                 val_dataloaders=val_loader)
