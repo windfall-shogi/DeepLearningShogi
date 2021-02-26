@@ -44,10 +44,19 @@ class ResidualBlock(nn.Module):
             )
             self.post_activator = self.activation()
 
+        if in_channels != out_channels:
+            self.bypass = nn.Conv2d(
+                in_channels=in_channels, out_channels=out_channels,
+                kernel_size=1
+            )
+        else:
+            self.bypass = nn.Identity()
+
     def forward(self, x):
         h = self.net(x)
+        g = self.bypass(x)
         if self.pre_act:
-            y = h + x
+            y = h + g
         else:
-            y = self.post_activator(h + x)
+            y = self.post_activator(h + g)
         return y
