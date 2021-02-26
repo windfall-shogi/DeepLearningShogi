@@ -13,6 +13,7 @@ import torch.nn.functional as F
 from torch import nn
 # noinspection PyProtectedMember
 from torch.utils.data import DataLoader, Dataset
+from torch.optim.swa_utils import AveragedModel, SWALR
 
 import cshogi
 import cppshogi
@@ -71,32 +72,10 @@ class Network(pl.LightningModule):
         self.net = PolicyValueNetwork(blocks=blocks, channels=channels,
                                       features=features, pre_act=pre_act,
                                       activation=activation)
+        self.swa_model = AveragedModel(self.net)
 
         self.ce = nn.CrossEntropyLoss(reduction='none')
         self.bce = nn.BCEWithLogitsLoss()
-
-        self.accuracy_list = nn.ModuleList((
-            pl.metrics.Accuracy(), pl.metrics.Accuracy(),
-            pl.metrics.Accuracy(), pl.metrics.Accuracy(),
-            pl.metrics.Accuracy(), pl.metrics.Accuracy()
-        ))
-        self.train_metrics = {
-            'loss1': 0, 'loss2': 0, 'loss3': 0, 'count': 0,
-            'accuracy1': self.accuracy_list[0],
-            'accuracy2': self.accuracy_list[1]
-        }
-        self.val_metrics = {
-            'loss1': 0, 'loss2': 0, 'loss3': 0, 'count': 0,
-            'accuracy1': self.accuracy_list[2],
-            'accuracy2': self.accuracy_list[3],
-            'entropy1': 0, 'entropy2': 0
-        }
-        self.test_metrics = {
-            'loss1': 0, 'loss2': 0, 'loss3': 0, 'count': 0,
-            'accuracy1': self.accuracy_list[4],
-            'accuracy2': self.accuracy_list[5],
-            'entropy1': 0, 'entropy2': 0
-        }
 
     def load_pretrained_value(self, pretrained_model_path):
         copy_pretrained_value(pretrained_model_path=pretrained_model_path,
@@ -121,36 +100,19 @@ class Network(pl.LightningModule):
         loss = (loss1 + (1 - self.hparams.val_lambda) * loss2 +
                 self.hparams.val_lambda * loss3)
 
-        p1 = y1.softmax(dim=-1)
-        p2 = y2.sigmoid()
-        t2 = t2.type(torch.int64)
-
-        self.train_metrics['loss1'] += loss1.item()
-        self.train_metrics['loss2'] += loss2.item()
-        self.train_metrics['loss3'] += loss3.item()
-        self.train_metrics['accuracy1'].update(preds=p1, target=t1)
-        self.train_metrics['accuracy2'].update(preds=p2, target=t2)
-        self.train_metrics['count'] += 1
+        self.log_dict({
+            'loss': loss, 'loss/1': loss1, 'loss/2': loss2, 'loss/3': loss3,
+            'accuracy/1':
+                (torch.max(y1, dim=1)[1] == t1).type(torch.float32).mean(),
+            'accuracy/2':
+                ((y2 >= 0) == (t2 >= 0.5)).type(torch.float32).mean()
+        })
 
         return loss
 
     def training_epoch_end(self, outputs: List[Any]) -> None:
-        loss1 = self.train_metrics['loss1'] / self.train_metrics['count']
-        loss2 = self.train_metrics['loss2'] / self.train_metrics['count']
-        loss3 = self.train_metrics['loss3'] / self.train_metrics['count']
-        loss = (loss1 + (1 - self.hparams.val_lambda) * loss2 +
-                self.hparams.val_lambda * loss3)
-        self.log_dict({
-            'loss': loss, 'loss/1': loss1, 'loss/2': loss2, 'loss/3': loss3,
-            'accuracy/1': self.train_metrics['accuracy1'].compute(),
-            'accuracy/2': self.train_metrics['accuracy2'].compute()
-        })
-
-        for key in self.train_metrics:
-            if 'accuracy' in key:
-                self.train_metrics[key].reset()
-            else:
-                self.train_metrics[key] = 0
+        self.swa_model.update_parameters(self.net)
+        self.swa_scheduler.step()
 
     def validation_step(self, batch, batch_idx):
         x1, x2, t1, t2, z, value = batch
@@ -170,45 +132,22 @@ class Network(pl.LightningModule):
         log1p_ey2 = F.softplus(y2)
         entropy2 = -(p2 * (y2 - log1p_ey2) + (1 - p2) * -log1p_ey2)
 
-        p1 = y1.softmax(dim=-1)
-        t2 = t2.type(torch.int64)
-
-        self.val_metrics['loss1'] += loss1.item()
-        self.val_metrics['loss2'] += loss2.item()
-        self.val_metrics['loss3'] += loss3.item()
-        self.val_metrics['entropy1'] += entropy1.mean().item()
-        self.val_metrics['entropy2'] += entropy2.mean().item()
-        self.val_metrics['accuracy1'].update(preds=p1, target=t1)
-        self.val_metrics['accuracy2'].update(preds=p2, target=t2)
-        self.val_metrics['count'] += 1
-
-        return loss
-
-    def validation_epoch_end(self, outputs: List[Any]) -> None:
-        loss1 = self.val_metrics['loss1'] / self.val_metrics['count']
-        loss2 = self.val_metrics['loss2'] / self.val_metrics['count']
-        loss3 = self.val_metrics['loss3'] / self.val_metrics['count']
-        loss = (loss1 + (1 - self.hparams.val_lambda) * loss2 +
-                self.hparams.val_lambda * loss3)
-        entropy1 = self.val_metrics['entropy1'] / self.val_metrics['count']
-        entropy2 = self.val_metrics['entropy2'] / self.val_metrics['count']
-        self.log_dict({
+        result = {
             'val_loss': loss, 'val_loss/1': loss1, 'val_loss/2': loss2,
             'val_loss/3': loss3,
-            'val_accuracy/1': self.val_metrics['accuracy1'].compute(),
-            'val_accuracy/2': self.val_metrics['accuracy2'].compute(),
-            'val_entropy/1': entropy1, 'val_entropy/2': entropy2
-        })
+            'val_accuracy/1':
+                (torch.max(y1, dim=1)[1] == t1).type(torch.float32).mean(),
+            'val_accuracy/2':
+                ((y2 >= 0) == (t2 >= 0.5)).type(torch.float32).mean(),
+            'val_entropy/1': entropy1.mean(), 'val_entropy/2': entropy2.mean()
+        }
+        self.log_dict(result)
 
-        for key in self.val_metrics:
-            if 'accuracy' in key:
-                self.val_metrics[key].reset()
-            else:
-                self.val_metrics[key] = 0
+        return result
 
     def test_step(self, batch, batch_idx):
         x1, x2, t1, t2, z, value = batch
-        y1, y2 = self((x1, x2))
+        y1, y2 = self.swa_model((x1, x2))
 
         t1 = t1.view(-1)
 
@@ -224,45 +163,25 @@ class Network(pl.LightningModule):
         log1p_ey2 = F.softplus(y2)
         entropy2 = -(p2 * (y2 - log1p_ey2) + (1 - p2) * -log1p_ey2)
 
-        p1 = y1.softmax(dim=-1)
-        t2 = t2.type(torch.int64)
-
-        self.test_metrics['loss1'] += loss1.item()
-        self.test_metrics['loss2'] += loss2.item()
-        self.test_metrics['loss3'] += loss3.item()
-        self.test_metrics['entropy1'] += entropy1.mean().item()
-        self.test_metrics['entropy2'] += entropy2.mean().item()
-        self.test_metrics['accuracy1'].update(preds=p1, target=t1)
-        self.test_metrics['accuracy2'].update(preds=p2, target=t2)
-        self.test_metrics['count'] += 1
-
-        result = {'loss': loss.item()}
-        for key, value in self.test_metrics.items():
-            if 'accuracy' in key:
-                result[key] = value.compute()
-            else:
-                result[key] = value
-        return result
-
-    def test_epoch_end(self, outputs: List[Any]) -> None:
-        loss1 = self.test_metrics['loss1'] / self.test_metrics['count']
-        loss2 = self.test_metrics['loss2'] / self.test_metrics['count']
-        loss3 = self.test_metrics['loss3'] / self.test_metrics['count']
-        loss = (loss1 + (1 - self.hparams.val_lambda) * loss2 +
-                self.hparams.val_lambda * loss3)
-        entropy1 = self.test_metrics['entropy1'] / self.test_metrics['count']
-        entropy2 = self.test_metrics['entropy2'] / self.test_metrics['count']
-        self.log_dict({
+        result = {
             'test_loss': loss, 'test_loss/1': loss1, 'test_loss/2': loss2,
             'test_loss/3': loss3,
-            'test_accuracy/1': self.test_metrics['accuracy1'].compute(),
-            'test_accuracy/2': self.test_metrics['accuracy2'].compute(),
-            'test_entropy/1': entropy1, 'test_entropy/2': entropy2
-        })
+            'test_accuracy/1':
+                (torch.max(y1, dim=1)[1] == t1).type(torch.float32).mean(),
+            'test_accuracy/2':
+                ((y2 >= 0) == (t2 >= 0.5)).type(torch.float32).mean(),
+            'test_entropy/1': entropy1.mean(),
+            'test_entropy/2': entropy2.mean()
+        }
+        self.log_dict(result)
+
+        return result
 
     # noinspection PyAttributeOutsideInit
     def configure_optimizers(self):
         optimizer = torch.optim.SGD(self.parameters(), lr=self.hparams.lr)
+        self.swa_scheduler = SWALR(optimizer, swa_lr=self.hparams.lr,
+                                   anneal_strategy='linear', anneal_epochs=10)
         return optimizer
 
 
@@ -311,6 +230,30 @@ class HCPEDataset(Dataset):
         return feature1, feature2, np.int64(move), result, z, value
 
 
+class BNDataset(Dataset):
+    def __init__(self, data):
+        self.data = data
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        feature1 = np.empty((FEATURES1_NUM, 9, 9), dtype=np.float32)
+        feature2 = np.empty((FEATURES2_NUM, 9, 9), dtype=np.float32)
+        move = np.empty(1, dtype=np.int32)
+        result = np.empty(1, dtype=np.float32)
+        value = np.empty_like(result)
+
+        # 要素を普通に取り出すとnp.void型になってしまう
+        cppshogi.hcpe_decode_with_value(
+            self.data[idx:idx + 1], feature1, feature2, move, result, value
+        )
+
+        z = result - value + 0.5
+
+        return (feature1, feature2), z
+
+
 def main():
     args = parse_args()
 
@@ -348,18 +291,19 @@ def main():
         save_top_k=3, mode='min'
     )
     swa = pl.callbacks.swa.StochasticWeightAveraging(
-        swa_epoch_start=args.swa_freq, swa_lrs=args.lr
+        swa_epoch_start=1, swa_lrs=args.lr
     )
     # 1 epochあたりのバッチ数を制限するので、全体のエポック数を調整
     n = args.swa_freq * args.batch_size
-    epochs = (len(train_dataset) + n - 1) // n
+    # epochs = (len(train_dataset) + n - 1) // n
+    epochs = 3
     max_epochs = args.epoch * epochs
     print('max epochs:', max_epochs)
     # validation dataを評価する頻度も調整
     interval = (args.eval_interval + args.swa_freq - 1) // args.swa_freq
     trainer = pl.Trainer(
-        callbacks=[checkpoint, swa], max_epochs=max_epochs, gpus=[0],
-        default_root_dir=str(output_dir), stochastic_weight_avg=True,
+        callbacks=[checkpoint], max_epochs=max_epochs, gpus=[1],
+        default_root_dir=str(output_dir), stochastic_weight_avg=False,
         fast_dev_run=args.fast_dev_run,
         precision=16 if args.use_amp else 32,
         # 1 epochあたりのバッチ数を制限して、epoch終了時のSWAの処理を実行させる
@@ -368,6 +312,12 @@ def main():
     )
     trainer.fit(model, train_dataloader=train_loader,
                 val_dataloaders=val_loader)
+
+    train_dataset2 = BNDataset(data=train_data[:10000])
+    train_loader2 = DataLoader(
+        train_dataset2, batch_size=args.batch_size, shuffle=True
+    )
+    torch.optim.swa_utils.update_bn(train_loader2, model.swa_model)
     metrics = trainer.test(model, test_dataloaders=test_loader)
     if isinstance(metrics, list):
         metrics = metrics[-1]
