@@ -43,9 +43,9 @@ class SeparableConv2d(nn.Module):
     def __init__(self, in_channels, out_channels):
         super(SeparableConv2d, self).__init__()
         self.net = nn.Sequential(
-            nn.Conv2d(in_channels=in_channels, out_channels=in_channels * 4,
+            nn.Conv2d(in_channels=in_channels, out_channels=in_channels * 2,
                       kernel_size=3, padding=1, groups=in_channels),
-            nn.Conv2d(in_channels=in_channels * 4, out_channels=out_channels,
+            nn.Conv2d(in_channels=in_channels * 2, out_channels=out_channels,
                       kernel_size=1)
         )
 
