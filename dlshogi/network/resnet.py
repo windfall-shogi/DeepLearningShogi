@@ -2,9 +2,10 @@
 # -*- coding: utf-8 -*-
 
 from torch import nn
+from rfconv import RFConv2d
 
 from .entry import Entry
-from .residual_block import ResidualBlock
+from .residual_block import ResidualBlock, ResidualBottleneckBlock
 
 __author__ = 'Yasuhiro'
 __date__ = '2021/02/14'
@@ -31,4 +32,31 @@ class NetworkBase(nn.Module):
     def forward(self, x):
         h = self.entry(x)
         y = self.blocks(h)
+        return y
+
+
+class NetworkBaseNext(nn.Module):
+    def __init__(self, blocks, channels, radix=1, groups=1,
+                 bottleneck_width=64,  rectified_conv=False, rectify_avg=False,
+                 norm_layer=nn.BatchNorm2d, activation=nn.SiLU, **kwargs):
+        super(NetworkBaseNext, self).__init__()
+
+        layers = [
+            Entry(out_channels=channels),
+            norm_layer(channels),
+            activation()
+        ]
+        layers.extend([
+            ResidualBottleneckBlock(
+                inplanes=channels, planes=channels,
+                radix=radix, cardinality=groups,
+                bottleneck_width=bottleneck_width,
+                rectified_conv=rectified_conv, rectify_avg=rectify_avg,
+                norm_layer=norm_layer
+            ) for _ in range(blocks)
+        ])
+        self.net = nn.Sequential(*layers)
+
+    def forward(self, x):
+        y = self.net(x)
         return y
