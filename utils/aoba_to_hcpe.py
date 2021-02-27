@@ -7,6 +7,17 @@ import lzma
 import math
 import argparse
 
+
+def convert_eval(p):
+    # dlshogiが使っている評価値を勝率に変換するときの定数
+    a = 0.0013226
+
+    e = np.log(max(p, 1e-3) / max(1 - p, 1e-3)) / a
+    # 通常の評価値はScoreMaxEvaluate=30000が上限のはず
+    e = np.clip(np.round(e), a_min=-30000, a_max=30000)
+    return e
+
+
 parser = argparse.ArgumentParser()
 parser.add_argument('csa_dir')
 parser.add_argument('out_dir')
@@ -16,6 +27,9 @@ csa_file_list = glob.glob(os.path.join(args.csa_dir, '**', '*.csa*'), recursive=
 os.makedirs(args.out_dir, exist_ok=True)
 
 hcpes = np.zeros(10000*512, HuffmanCodedPosAndEval)
+# 古いバージョンの棋譜だと評価値の情報がない
+# dlshogiのScoreNone=32602 で初期化する
+hcpes['eval'] = 32602
 
 board = Board()
 kif_num = 0
@@ -50,7 +64,7 @@ for filepath in csa_file_list:
         # 最後に最善手以外が指された局面から開始する
         board.set_sfen(kif.sfen)
         start_p = p
-        for i, move in enumerate(kif.moves):
+        for i, (move, comment) in enumerate(zip(kif.moves, kif.comments)):
             if i <= start:
                 board.push(move)
                 continue
@@ -64,6 +78,9 @@ for filepath in csa_file_list:
             board.to_hcp(hcpe['hcp'])
             hcpe['bestMove16'] = move16(move)
             hcpe['gameResult'] = kif.win
+            comments = comment.decode('ascii').split(',')
+            if comments[0].startswith('v='):
+                hcpe['eval'] = convert_eval(float(comments[0][2:]))
             p += 1
             board.push(move)
 
