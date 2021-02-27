@@ -303,7 +303,7 @@ def main():
     trainer.fit(model, train_dataloader=train_loader,
                 val_dataloaders=val_loader)
 
-    train_dataset2 = BNDataset(data=train_data[:10000])
+    train_dataset2 = BNDataset(data=train_data[:100000])
     train_loader2 = DataLoader(
         train_dataset2, batch_size=args.batch_size, shuffle=True
     )
