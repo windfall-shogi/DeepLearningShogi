@@ -37,6 +37,8 @@ def parse_args():
     parser.add_argument('--batch_size', type=int, default=100)
     parser.add_argument('--eval_interval', type=int, default=1000,
                         help='frequency (steps) to check validation')
+    parser.add_argument('--block', type=int, default=20)
+    parser.add_argument('--ch', type=int, default=256)
     parser.add_argument('--pre_act', action='store_true')
     parser.add_argument('--lr', type=float, default=1e-3)
     parser.add_argument('--swa_freq', type=int, default=250)
@@ -290,7 +292,7 @@ def main():
     if args.model_path is not None:
         model = Network.load_from_checkpoint(args.model_path)
     else:
-        model = Network(blocks=20, channels=256, features=256,
+        model = Network(blocks=args.block, channels=args.ch, features=256,
                         pre_act=args.pre_act, swa_freq=args.swa_freq)
         if args.pretrained_model_path is not None:
             copy_pretrained_value(
