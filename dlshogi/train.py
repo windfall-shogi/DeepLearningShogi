@@ -233,28 +233,38 @@ class HCPEDataset(Dataset):
         return feature1, feature2, np.int64(move), result, z, value
 
 
-class BNDataset(Dataset):
-    def __init__(self, data):
-        self.data = data
+def update_bn(loader, model, device=None):
+    """
+    torch.optim.swa_utils.update_bnではデータの形が合わなくて、
+    GPUに転送できないので、書き直した
+    """
+    momenta = {}
+    for module in model.modules():
+        if isinstance(module, torch.nn.modules.batchnorm._BatchNorm):
+            module.running_mean = torch.zeros_like(module.running_mean)
+            module.running_var = torch.ones_like(module.running_var)
+            momenta[module] = module.momentum
 
-    def __len__(self):
-        return len(self.data)
+    if not momenta:
+        return
 
-    def __getitem__(self, idx):
-        feature1 = np.empty((FEATURES1_NUM, 9, 9), dtype=np.float32)
-        feature2 = np.empty((FEATURES2_NUM, 9, 9), dtype=np.float32)
-        move = np.empty(1, dtype=np.int32)
-        result = np.empty(1, dtype=np.float32)
-        value = np.empty_like(result)
+    was_training = model.training
+    model.train()
+    for module in momenta.keys():
+        module.momentum = None
+        module.num_batches_tracked *= 0
 
-        # 要素を普通に取り出すとnp.void型になってしまう
-        cppshogi.hcpe_decode_with_value(
-            self.data[idx:idx + 1], feature1, feature2, move, result, value
-        )
+    for inputs in loader:
+        x1, x2, t1, t2, z, value = inputs
+        if device is not None:
+            x1 = x1.to(device)
+            x2 = x2.to(device)
 
-        z = result - value + 0.5
+        model((x1, x2))
 
-        return (feature1, feature2), z
+    for bn_module in momenta.keys():
+        bn_module.momentum = momenta[bn_module]
+    model.train(was_training)
 
 
 def main():
@@ -303,13 +313,13 @@ def main():
     trainer.fit(model, train_dataloader=train_loader,
                 val_dataloaders=val_loader)
 
-    train_dataset2 = BNDataset(data=train_data[:100000])
+    train_dataset2 = HCPEDataset(data=train_data[:100000])
     train_loader2 = DataLoader(
         train_dataset2, batch_size=args.batch_size, shuffle=True
     )
     device = torch.device('cuda:0')
     swa_model = model.swa_model.to(device=device)
-    torch.optim.swa_utils.update_bn(train_loader2, swa_model, device=device)
+    update_bn(train_loader2, swa_model, device=device)
     metrics = trainer.test(model, test_dataloaders=test_loader)
     if isinstance(metrics, list):
         metrics = metrics[-1]
