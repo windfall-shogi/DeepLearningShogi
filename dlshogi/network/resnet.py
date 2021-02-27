@@ -14,13 +14,7 @@ class NetworkBase(nn.Module):
     def __init__(self, blocks, channels, pre_act=False, activation=nn.SiLU):
         super(NetworkBase, self).__init__()
         if pre_act:
-            self.entry = nn.Sequential(
-                Entry(out_channels=channels // 4),
-                ResidualBlock(in_channels=channels // 4,
-                              out_channels=channels // 2, pre_act=pre_act),
-                ResidualBlock(in_channels=channels // 2,
-                              out_channels=channels, pre_act=pre_act)
-            )
+            self.entry = Entry(out_channels=channels)
         else:
             self.entry = nn.Sequential(
                 Entry(out_channels=channels),
