@@ -4,7 +4,8 @@
 import torch
 from torch import nn
 
-from .resnet import NetworkBase
+# from .resnet import NetworkBase
+from .xception import NetworkBase
 from .exit import Policy, Value
 
 __author__ = 'Yasuhiro'
