@@ -6,7 +6,6 @@ import torch.nn.functional as F
 from torch import nn
 # noinspection PyProtectedMember
 from torch.nn.modules.utils import _pair as pair
-from rfconv import RFConv2d
 
 __author__ = 'Yasuhiro'
 __date__ = '2021/02/14'
@@ -107,6 +106,7 @@ class ResidualBottleneckBlock(nn.Module):
                 dropblock_prob=dropblock_prob
             )
         elif rectified_conv:
+            from rfconv import RFConv2d
             self.conv2 = RFConv2d(
                 group_width, group_width, kernel_size=3, stride=stride,
                 padding=dilation, dilation=dilation,
@@ -191,6 +191,7 @@ class SplitAttentionConv2d(nn.Module):
         self.dropblock_prob = dropblock_prob
 
         if self.rectify:
+            from rfconv import RFConv2d
             self.conv = RFConv2d(
                 in_channels=in_channels, out_channels=channels * radix,
                 kernel_size=kernel_size, stride=stride, padding=padding,
@@ -228,10 +229,11 @@ class SplitAttentionConv2d(nn.Module):
         if self.use_bn:
             x = self.bn0(x)
         if self.dropblock_prob > 0.0:
+            # noinspection PyCallingNonCallable
             x = self.dropblock(x)
         x = self.relu(x)
 
-        batch, rchannel = x.reshape[:2]
+        batch, rchannel = x.shape[:2]
         if self.radix > 1:
             split = torch.split(x, rchannel // self.radix, dim=1)
             gap = sum(split)
