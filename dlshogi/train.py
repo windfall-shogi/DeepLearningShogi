@@ -307,7 +307,9 @@ def main():
     train_loader2 = DataLoader(
         train_dataset2, batch_size=args.batch_size, shuffle=True
     )
-    torch.optim.swa_utils.update_bn(train_loader2, model.swa_model)
+    device = torch.device('cuda:0')
+    swa_model = model.swa_model.to(device=device)
+    torch.optim.swa_utils.update_bn(train_loader2, swa_model, device=device)
     metrics = trainer.test(model, test_dataloaders=test_loader)
     if isinstance(metrics, list):
         metrics = metrics[-1]
