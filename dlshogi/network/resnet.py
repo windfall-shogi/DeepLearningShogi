@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 
 from torch import nn
-from rfconv import RFConv2d
 
 from .entry import Entry
 from .residual_block import ResidualBlock, ResidualBottleneckBlock
@@ -48,7 +47,7 @@ class NetworkBaseNext(nn.Module):
         ]
         layers.extend([
             ResidualBottleneckBlock(
-                inplanes=channels, planes=channels,
+                inplanes=channels, planes=channels // 4,
                 radix=radix, cardinality=groups,
                 bottleneck_width=bottleneck_width,
                 rectified_conv=rectified_conv, rectify_avg=rectify_avg,
