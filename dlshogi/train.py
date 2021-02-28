@@ -42,6 +42,7 @@ def parse_args():
     parser.add_argument('--pre_act', action='store_true')
     parser.add_argument('--radix', type=int, default=1)
     parser.add_argument('--groups', type=int, default=1, help='cardinality')
+    parser.add_argument('--bottleneck_width', type=int, default=64)
     parser.add_argument('--lr', type=float, default=1e-3)
     parser.add_argument('--swa_freq', type=int, default=250)
     parser.add_argument('--swa_n_avr', type=int, default=10)
@@ -69,7 +70,7 @@ def copy_pretrained_value(pretrained_model_path, model):
 class Network(pl.LightningModule):
     # noinspection PyUnusedLocal
     def __init__(self, blocks, channels, features, pre_act=False,
-                 radix=1, groups=1,
+                 radix=1, groups=1, bottleneck_width=64,
                  activation=nn.SiLU, beta=0, val_lambda=0.333, lr=1e-2,
                  swa_freq=250):
         super(Network, self).__init__()
@@ -77,7 +78,8 @@ class Network(pl.LightningModule):
 
         self.net = PolicyValueNetwork(
             blocks=blocks, channels=channels, features=features,
-            pre_act=pre_act, activation=activation, radix=radix, groups=groups
+            pre_act=pre_act, activation=activation,
+            radix=radix, groups=groups, bottleneck_width=bottleneck_width
         )
         self.swa_model = AveragedModel(self.net)
 
