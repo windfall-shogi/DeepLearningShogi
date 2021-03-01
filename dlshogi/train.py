@@ -5,6 +5,7 @@ import argparse
 import re
 from pathlib import Path
 from typing import Any, List
+from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
 import pytorch_lightning as pl
@@ -241,6 +242,87 @@ class HCPEDataset(Dataset):
         return feature1, feature2, np.int64(move), result, z, value
 
 
+class HCPEDataLoader(DataLoader):
+    # noinspection PyArgumentList
+    def __init__(self, data, batch_size, shuffle=False, device=None):
+        self.data = data
+        self.shuffle = shuffle
+        self.device = device or torch.device('cuda')
+
+        self.torch_features1 = torch.empty(
+            (batch_size, FEATURES1_NUM, 9, 9), dtype=torch.float32,
+            pin_memory=True
+        )
+        self.torch_features2 = torch.empty(
+            (batch_size, FEATURES2_NUM, 9, 9), dtype=torch.float32,
+            pin_memory=True
+        )
+        self.torch_move = torch.empty(
+            (batch_size, 1), dtype=torch.int64, pin_memory=True
+        )
+        self.torch_result = torch.empty(
+            (batch_size, 1), dtype=torch.float32, pin_memory=True
+        )
+        self.torch_value = torch.empty(
+            (batch_size, 1), dtype=torch.float32, pin_memory=True
+        )
+
+        self.features1 = self.torch_features1.numpy()
+        self.features2 = self.torch_features2.numpy()
+        self.move = self.torch_move.numpy()
+        self.result = self.torch_result.numpy()
+        self.value = self.torch_value.numpy()
+
+        self.i = 0
+        self.executor = ThreadPoolExecutor(max_workers=1)
+
+        dataset = HCPEDataset(data=data)
+        super(HCPEDataLoader, self).__init__(dataset, batch_size=batch_size)
+
+    def mini_batch(self, hcpevec):
+        cppshogi.hcpe_decode_with_value(
+            hcpevec, self.features1, self.features2, self.move,
+            self.result, self.value
+        )
+
+        z = self.result - self.value + 0.5
+
+        return (self.torch_features1.to(self.device),
+                self.torch_features2.to(self.device),
+                self.torch_move.to(self.device),
+                self.torch_result.to(self.device),
+                torch.tensor(z).to(self.device),
+                self.torch_value.to(self.device))
+
+    def sample(self):
+        return self.mini_batch(np.random.choice(self.data, self.batch_size))
+
+    def pre_fetch(self):
+        hcpevec = self.data[self.i:self.i+self.batch_size]
+        if len(hcpevec) == 0:
+            return
+        self.i += self.batch_size
+
+        # noinspection PyAttributeOutsideInit
+        self.f = self.executor.submit(self.mini_batch, hcpevec)
+
+    def __iter__(self):
+        self.i = 0
+        if self.shuffle:
+            np.random.shuffle(self.data)
+        self.pre_fetch()
+        return self
+
+    def __next__(self):
+        if self.i >= len(self.data) - self.batch_size + 1:
+            raise StopIteration()
+
+        result = self.f.result()
+        self.pre_fetch()
+
+        return result
+
+
 def update_bn(loader, model, device=None):
     """
     torch.optim.swa_utils.update_bnではデータの形が合わなくて、
@@ -281,15 +363,15 @@ def main():
     train_data = load_data(data_dir=args.data_dir, pattern=args.pattern)
     test_data = np.fromfile(args.test_data,
                             dtype=cshogi.HuffmanCodedPosAndEval)
-    train_dataset = HCPEDataset(data=train_data)
-    val_dataset = HCPEDataset(data=test_data[:args.batch_size * 10])
-    test_dataset = HCPEDataset(data=test_data)
-    train_loader = DataLoader(train_dataset, batch_size=args.batch_size,
-                              shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=args.batch_size,
-                            shuffle=False)
-    test_loader = DataLoader(test_dataset, batch_size=args.batch_size,
-                             shuffle=False)
+
+    device = torch.device('cuda')
+
+    train_loader = HCPEDataLoader(train_data, batch_size=args.batch_size,
+                                  shuffle=True, device=device)
+    val_loader = HCPEDataLoader(test_data[:args.batch_size * 10],
+                                batch_size=args.batch_size, device=device)
+    test_loader = HCPEDataLoader(test_data, batch_size=args.batch_size,
+                                 device=device)
 
     output_dir = Path(args.output_dir)
     if not output_dir.exists():
@@ -322,11 +404,10 @@ def main():
     trainer.fit(model, train_dataloader=train_loader,
                 val_dataloaders=val_loader)
 
-    train_dataset2 = HCPEDataset(data=train_data[:100000])
-    train_loader2 = DataLoader(
-        train_dataset2, batch_size=args.batch_size, shuffle=True
+    train_loader2 = HCPEDataLoader(
+        train_data[:100000], batch_size=args.batch_size,
+        shuffle=True, device=device
     )
-    device = torch.device('cuda:0')
     swa_model = model.swa_model.to(device=device)
     update_bn(train_loader2, swa_model, device=device)
     metrics = trainer.test(model, test_dataloaders=test_loader)
