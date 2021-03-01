@@ -11,7 +11,8 @@ __date__ = '2021/02/14'
 
 
 class NetworkBase(nn.Module):
-    def __init__(self, blocks, channels, pre_act=False, activation=nn.SiLU):
+    def __init__(self, blocks, channels, pre_act=False, activation=nn.SiLU,
+                 **kwargs):
         super(NetworkBase, self).__init__()
         if pre_act:
             self.entry = Entry(out_channels=channels)
