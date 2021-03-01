@@ -105,6 +105,9 @@ class SpatialSE(nn.Module):
 
     def forward(self, x):
         h = self.net(x)
+        batch = h.size(0)
+        h = h.view(batch, -1, 1, 1)
+
         y = h * x
         return y
 
