@@ -43,23 +43,15 @@ parser.add_argument('--use_amp', action='store_true', help='Use automatic mixed 
 args = parser.parse_args()
 
 if args.network == 'wideresnet15':
-    from dlshogi.policy_value_network_wideresnet15 import PolicyValueNetwork
-    model = PolicyValueNetwork()
+    from dlshogi.policy_value_network_wideresnet15 import *
 elif args.network == 'senet10':
-    from dlshogi.policy_value_network_senet10 import PolicyValueNetwork
-    model = PolicyValueNetwork()
+    from dlshogi.policy_value_network_senet10 import *
 elif args.network == 'resnet10_swish':
-    from dlshogi.policy_value_network_resnet10_swish import PolicyValueNetwork
-    model = PolicyValueNetwork()
+    from dlshogi.policy_value_network_resnet10_swish import *
 elif args.network == 'resnet20_swish':
-    from dlshogi.policy_value_network_resnet20_swish import PolicyValueNetwork
-    model = PolicyValueNetwork()
-elif re.fullmatch(r'resnet(?:\d+)ch(?:\d+)_(?:relu|swish|mish|tanhexp)', args.network):
-    from dlshogi.policy_value_network_resnet_b import getPolicyValueNetwork
-    model = getPolicyValueNetwork(args.network)
+    from dlshogi.policy_value_network_resnet20_swish import *
 else:
-    from dlshogi.policy_value_network import PolicyValueNetwork
-    model = PolicyValueNetwork()
+    from dlshogi.policy_value_network import *
 
 logging.basicConfig(format='%(asctime)s\t%(levelname)s\t%(message)s', datefmt='%Y/%m/%d %H:%M:%S', filename=args.log, level=logging.DEBUG)
 logging.info('network={}'.format(args.network))
@@ -75,6 +67,7 @@ if args.gpu >= 0:
 else:
     device = torch.device("cpu")
 
+model = PolicyValueNetwork()
 model.to(device)
 
 base_optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=0.9, weight_decay=args.weightdecay_rate, nesterov=True)
