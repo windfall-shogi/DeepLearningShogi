@@ -4,7 +4,8 @@
 from torch import nn
 
 from .entry import Entry
-from .residual_block import ResidualBlock, ResidualBottleneckBlock
+from .residual_block import (ResidualBlock, ResidualBottleneckBlock,
+                             BasicBlockFRN)
 
 __author__ = 'Yasuhiro'
 __date__ = '2021/02/14'
@@ -26,6 +27,22 @@ class NetworkBase(nn.Module):
         self.blocks = nn.Sequential(*[
             ResidualBlock(in_channels=channels, out_channels=channels,
                           pre_act=pre_act, activation=activation)
+            for _ in range(blocks)
+        ])
+
+    def forward(self, x):
+        h = self.entry(x)
+        y = self.blocks(h)
+        return y
+
+
+class NetworkBaseFRN(nn.Module):
+    def __init__(self, blocks, channels, **kwargs):
+        super(NetworkBaseFRN, self).__init__()
+        self.entry = Entry(out_channels=channels)
+
+        self.blocks = nn.Sequential(*[
+            BasicBlockFRN(in_channels=channels, out_channels=channels)
             for _ in range(blocks)
         ])
 

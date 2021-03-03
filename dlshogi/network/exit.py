@@ -6,23 +6,36 @@ from torch import nn
 
 from ..common import MAX_MOVE_LABEL_NUM
 from .residual_block import GlobalAvgPool2d
+from .norm import FilterResponseNorm
 
 __author__ = 'Yasuhiro'
 __date__ = '2021/02/21'
 
 
 class Policy(nn.Module):
-    def __init__(self, in_channels):
+    def __init__(self, in_channels, use_frn=False):
         super(Policy, self).__init__()
-        self.net = nn.Sequential(
-            ResidualBlockSE(channels=in_channels),
-            nn.Conv2d(
-                in_channels=in_channels, out_channels=MAX_MOVE_LABEL_NUM,
-                kernel_size=1, bias=False
-            ),
-            Reshape(-1, MAX_MOVE_LABEL_NUM * 9 * 9),
-            Bias(MAX_MOVE_LABEL_NUM * 9 * 9)
-        )
+        if use_frn:
+            self.net = nn.Sequential(
+                BasicBlockFRNSE(in_channels=in_channels,
+                                out_channels=in_channels),
+                nn.Conv2d(
+                    in_channels=in_channels, out_channels=MAX_MOVE_LABEL_NUM,
+                    kernel_size=1, bias=False
+                ),
+                Reshape(-1, MAX_MOVE_LABEL_NUM * 9 * 9),
+                Bias(MAX_MOVE_LABEL_NUM * 9 * 9)
+            )
+        else:
+            self.net = nn.Sequential(
+                ResidualBlockSE(channels=in_channels),
+                nn.Conv2d(
+                    in_channels=in_channels, out_channels=MAX_MOVE_LABEL_NUM,
+                    kernel_size=1, bias=False
+                ),
+                Reshape(-1, MAX_MOVE_LABEL_NUM * 9 * 9),
+                Bias(MAX_MOVE_LABEL_NUM * 9 * 9)
+            )
 
     def forward(self, x):
         return self.net(x)
@@ -83,6 +96,29 @@ class ResidualBlockSE(nn.Module):
         )
         self.s_se = SpatialSE(channels=channels, ratio=16)
         self.d_se = DepthSE(channels=channels)
+
+    def forward(self, x):
+        h = self.net(x)
+        h_s = self.s_se(h)
+        h_d = self.d_se(h)
+        y = (h_s + h_d) + x
+        return y
+
+
+class BasicBlockFRNSE(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(BasicBlockFRNSE, self).__init__()
+
+        self.net = nn.Sequential(
+            FilterResponseNorm(num_features=in_channels),
+            nn.Conv2d(in_channels=in_channels, out_channels=out_channels,
+                      kernel_size=3, padding=1, bias=False),
+            FilterResponseNorm(num_features=out_channels),
+            nn.Conv2d(in_channels=out_channels, out_channels=out_channels,
+                      kernel_size=3, padding=1)
+        )
+        self.s_se = SpatialSE(channels=out_channels, ratio=16)
+        self.d_se = DepthSE(channels=out_channels)
 
     def forward(self, x):
         h = self.net(x)

@@ -7,6 +7,8 @@ from torch import nn
 # noinspection PyProtectedMember
 from torch.nn.modules.utils import _pair as pair
 
+from .norm import FilterResponseNorm
+
 __author__ = 'Yasuhiro'
 __date__ = '2021/02/14'
 
@@ -292,3 +294,25 @@ class GlobalAvgPool2d(nn.Module):
         # noinspection PyTypeChecker
         return nn.functional.adaptive_avg_pool2d(inputs, 1).view(
             inputs.size(0), -1)
+
+
+class BasicBlockFRN(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(BasicBlockFRN, self).__init__()
+        self.net = nn.Sequential(
+            FilterResponseNorm(num_features=in_channels),
+            nn.Conv2d(
+                in_channels=in_channels, out_channels=out_channels,
+                kernel_size=3, padding=1
+            ),
+            FilterResponseNorm(num_features=in_channels),
+            nn.Conv2d(
+                in_channels=in_channels, out_channels=out_channels,
+                kernel_size=3, padding=1
+            )
+        )
+
+    def forward(self, x):
+        h = self.net(x)
+        y = h + x
+        return y
