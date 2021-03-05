@@ -287,12 +287,8 @@ class HCPEDataLoader(DataLoader):
 
         z = self.result - self.value + 0.5
 
-        return (self.torch_features1.to(self.device),
-                self.torch_features2.to(self.device),
-                self.torch_move.to(self.device),
-                self.torch_result.to(self.device),
-                torch.tensor(z).to(self.device),
-                self.torch_value.to(self.device))
+        return (self.torch_features1, self.torch_features2, self.torch_move,
+                self.torch_result, torch.tensor(z), self.torch_value)
 
     def sample(self):
         return self.mini_batch(np.random.choice(self.data, self.batch_size))
@@ -318,6 +314,9 @@ class HCPEDataLoader(DataLoader):
             raise StopIteration()
 
         result = self.f.result()
+        # 次のバッチを要求されてからGPUに転送する
+        result = [t.to(self.device, non_blocking=False) for t in result]
+        # GPUに転送されたのを見届けてから次のデータを作る
         self.pre_fetch()
 
         return result
