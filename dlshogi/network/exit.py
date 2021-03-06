@@ -75,6 +75,7 @@ class Bias(nn.Module):
     def __init__(self, shape):
         super(Bias, self).__init__()
         self.bias = nn.Parameter(torch.Tensor(shape))
+        nn.init.zeros_(self.bias)
 
     def forward(self, x):
         return x + self.bias
