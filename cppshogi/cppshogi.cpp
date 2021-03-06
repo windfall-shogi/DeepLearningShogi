@@ -64,8 +64,8 @@ inline void make_input_features(const Position& position, features1_t* features1
 		const Rank king_rank = makeRank(king_sq);
 		for (File f = FileBegin; f < FileNum; ++f) {
 			for (Rank r = RankBegin; r < RankNum; ++r) {
-				(*features1)[c2][PIECETYPE_NUM + PIECETYPE_NUM + MAX_ATTACK_NUM + 0][makeSquare(f, r)] = (f - king_file) / 8.0f;
-				(*features1)[c2][PIECETYPE_NUM + PIECETYPE_NUM + MAX_ATTACK_NUM + 1][makeSquare(f, r)] = (r - king_rank) / 8.0f;
+				(*features1)[c2][PIECETYPE_NUM + PIECETYPE_NUM + MAX_ATTACK_NUM + 0][makeSquare(f, r)] = static_cast<float>(f - king_file) / 8.0f;
+				(*features1)[c2][PIECETYPE_NUM + PIECETYPE_NUM + MAX_ATTACK_NUM + 1][makeSquare(f, r)] = static_cast<float>(r - king_rank) / 8.0f;
 			}
 		}
 
