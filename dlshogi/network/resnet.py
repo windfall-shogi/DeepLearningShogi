@@ -4,8 +4,8 @@
 from torch import nn
 
 from .entry import Entry
-from .residual_block import (ResidualBlock, ResidualBottleneckBlock,
-                             BasicBlockFRN)
+from .residual_block import (BasicBlock, BottleneckBlockNext,
+                             BasicBlockFRN, BasicBlockSE)
 
 __author__ = 'Yasuhiro'
 __date__ = '2021/02/14'
@@ -13,7 +13,7 @@ __date__ = '2021/02/14'
 
 class NetworkBase(nn.Module):
     def __init__(self, blocks, channels, pre_act=False, activation=nn.SiLU,
-                 **kwargs):
+                 squeeze_excitation=True, **kwargs):
         super(NetworkBase, self).__init__()
         if pre_act:
             self.entry = Entry(out_channels=channels)
@@ -24,11 +24,18 @@ class NetworkBase(nn.Module):
                 activation()
             )
 
-        self.blocks = nn.Sequential(*[
-            ResidualBlock(in_channels=channels, out_channels=channels,
-                          pre_act=pre_act, activation=activation)
-            for _ in range(blocks)
-        ])
+        if squeeze_excitation:
+            assert pre_act, "pre activation only!"
+            self.blocks = nn.Sequential(*[
+                BasicBlockSE(channels=channels, activation=activation)
+                for _ in range(blocks)
+            ])
+        else:
+            self.blocks = nn.Sequential(*[
+                BasicBlock(in_channels=channels, out_channels=channels,
+                           pre_act=pre_act, activation=activation)
+                for _ in range(blocks)
+            ])
 
     def forward(self, x):
         h = self.entry(x)
@@ -64,7 +71,7 @@ class NetworkBaseNext(nn.Module):
             activation()
         ]
         layers.extend([
-            ResidualBottleneckBlock(
+            BottleneckBlockNext(
                 inplanes=channels, planes=channels // 4,
                 radix=radix, cardinality=groups,
                 bottleneck_width=bottleneck_width,

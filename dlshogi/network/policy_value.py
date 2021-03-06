@@ -16,15 +16,14 @@ __date__ = '2021/02/21'
 
 class PolicyValueNetwork(nn.Module):
     def __init__(self, blocks, channels, features, pre_act=False,
-                 activation=nn.SiLU, radix=1, groups=1, bottleneck_width=64,
-                 use_frn=False):
+                 activation=nn.SiLU, squeeze_excitation=True, **kwargs):
         super(PolicyValueNetwork, self).__init__()
         self.base = NetworkBase(
             blocks=blocks, channels=channels, pre_act=pre_act,
-            activation=activation, radix=radix, groups=groups,
-            bottleneck_width=bottleneck_width
+            activation=activation, squeeze_excitation=squeeze_excitation,
+            **kwargs
         )
-        self.policy_network = Policy(in_channels=channels, use_frn=use_frn)
+        self.policy_network = Policy(in_channels=channels, **kwargs)
         self.value_network = Value(
             in_channels=channels, num_features=features, activation=activation
         )

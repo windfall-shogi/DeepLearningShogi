@@ -41,6 +41,8 @@ def parse_args():
     parser.add_argument('--block', type=int, default=20)
     parser.add_argument('--ch', type=int, default=256)
     parser.add_argument('--pre_act', action='store_true')
+    parser.add_argument('--se', action='store_true',
+                        help='squeeze & excitation')
     parser.add_argument('--radix', type=int, default=1)
     parser.add_argument('--groups', type=int, default=1, help='cardinality')
     parser.add_argument('--bottleneck_width', type=int, default=64)
@@ -72,14 +74,15 @@ class Network(pl.LightningModule):
     # noinspection PyUnusedLocal
     def __init__(self, blocks, channels, features, pre_act=False,
                  radix=1, groups=1, bottleneck_width=64,
-                 activation=nn.SiLU, beta=0, val_lambda=0.333, lr=1e-2,
-                 swa_freq=250):
+                 activation=nn.SiLU, squeeze_excitation=False,
+                 beta=0, val_lambda=0.333, lr=1e-2, swa_freq=250):
         super(Network, self).__init__()
         self.save_hyperparameters()
 
         self.net = PolicyValueNetwork(
             blocks=blocks, channels=channels, features=features,
             pre_act=pre_act, activation=activation,
+            squeeze_excitation=squeeze_excitation,
             radix=radix, groups=groups, bottleneck_width=bottleneck_width
         )
         self.swa_model = AveragedModel(self.net)
@@ -383,9 +386,11 @@ def main():
     if args.model_path is not None:
         model = Network.load_from_checkpoint(args.model_path)
     else:
-        model = Network(blocks=args.block, channels=args.ch, features=256,
-                        pre_act=args.pre_act, swa_freq=args.swa_freq,
-                        radix=args.radix, groups=args.groups)
+        model = Network(
+            blocks=args.block, channels=args.ch, features=256,
+            pre_act=args.pre_act, squeeze_excitation=args.se,
+            swa_freq=args.swa_freq, radix=args.radix, groups=args.groups
+        )
         if args.pretrained_model_path is not None:
             copy_pretrained_value(
                 pretrained_model_path=args.pretrained_model_path,
@@ -408,7 +413,7 @@ def main():
                 val_dataloaders=val_loader)
 
     train_loader2 = HCPEDataLoader(
-        train_data[:100000], batch_size=args.batch_size,
+        train_data, batch_size=args.batch_size,
         shuffle=True, device=device
     )
     swa_model = model.swa_model.to(device=device)
