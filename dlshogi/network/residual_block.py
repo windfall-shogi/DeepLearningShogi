@@ -79,14 +79,14 @@ class BottleneckBlock(nn.Module):
                 in_channels=channels, out_channels=channels // expansion,
                 kernel_size=1, padding=0, bias=False
             ),
-            nn.BatchNorm2d(num_features=channels),
+            nn.BatchNorm2d(num_features=channels // expansion),
             activation(),
             nn.Conv2d(
                 in_channels=channels // expansion,
                 out_channels=channels // expansion,
                 kernel_size=3, padding=1, bias=False
             ),
-            nn.BatchNorm2d(num_features=channels),
+            nn.BatchNorm2d(num_features=channels // expansion),
             activation(),
             nn.Conv2d(
                 in_channels=channels // expansion, out_channels=channels,
