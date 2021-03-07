@@ -15,6 +15,7 @@ from torch import nn
 # noinspection PyProtectedMember
 from torch.utils.data import DataLoader, Dataset
 from torch.optim.swa_utils import AveragedModel, SWALR
+from tqdm import tqdm
 
 import cshogi
 import cppshogi
@@ -350,7 +351,7 @@ def update_bn(loader, model, device=None):
         module.momentum = None
         module.num_batches_tracked *= 0
 
-    for inputs in loader:
+    for inputs in tqdm(loader):
         x1, x2, t1, t2, z, value = inputs
         if device is not None:
             x1 = x1.to(device)
