@@ -326,7 +326,7 @@ class HCPEDataLoader(DataLoader):
         return result
 
     def __len__(self):
-        return (len(self.data) + self.batch_size - 1) // self.batch_size
+        return len(self.data) // self.batch_size
 
 
 def update_bn(loader, model, device=None):
