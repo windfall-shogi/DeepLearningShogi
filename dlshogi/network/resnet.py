@@ -4,8 +4,10 @@
 from torch import nn
 
 from .entry import Entry
-from .residual_block import (BasicBlock, BottleneckBlockNext,
-                             BasicBlockFRN, BasicBlockSE, BasicBlockDilationSE)
+from .residual_block import (
+    BasicBlock, BottleneckBlockNext, BasicBlockFRN, BasicBlockSE,
+    BasicBlockDilationSE, BottleneckBlock
+)
 
 __author__ = 'Yasuhiro'
 __date__ = '2021/02/14'
@@ -13,7 +15,8 @@ __date__ = '2021/02/14'
 
 class NetworkBase(nn.Module):
     def __init__(self, blocks, channels, pre_act=False, activation=nn.SiLU,
-                 squeeze_excitation=True, **kwargs):
+                 squeeze_excitation=True, bottleneck=True,
+                 bottleneck_expansion=4, **kwargs):
         super(NetworkBase, self).__init__()
         if pre_act:
             self.entry = Entry(out_channels=channels)
@@ -31,11 +34,18 @@ class NetworkBase(nn.Module):
                 for _ in range(blocks)
             ])
         else:
-            self.blocks = nn.Sequential(*[
-                BasicBlock(in_channels=channels, out_channels=channels,
-                           pre_act=pre_act, activation=activation)
-                for _ in range(blocks)
-            ])
+            if bottleneck:
+                self.blocks = nn.Sequential(*[
+                    BottleneckBlock(channels=channels, activation=activation,
+                                    expansion=bottleneck_expansion)
+                    for _ in range(blocks)
+                ])
+            else:
+                self.blocks = nn.Sequential(*[
+                    BasicBlock(in_channels=channels, out_channels=channels,
+                               pre_act=pre_act, activation=activation)
+                    for _ in range(blocks)
+                ])
 
     def forward(self, x):
         h = self.entry(x)

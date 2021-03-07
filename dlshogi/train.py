@@ -44,6 +44,8 @@ def parse_args():
     parser.add_argument('--pre_act', action='store_true')
     parser.add_argument('--se', action='store_true',
                         help='squeeze & excitation')
+    parser.add_argument('--bottleneck', action='store_true')
+    parser.add_argument('--bottleneck_expansion', type=int, default=4)
     parser.add_argument('--radix', type=int, default=1)
     parser.add_argument('--groups', type=int, default=1, help='cardinality')
     parser.add_argument('--bottleneck_width', type=int, default=64)
@@ -76,6 +78,7 @@ class Network(pl.LightningModule):
     def __init__(self, blocks, channels, features, pre_act=False,
                  radix=1, groups=1, bottleneck_width=64,
                  activation=nn.SiLU, squeeze_excitation=False,
+                 bottleneck=False, bottleneck_expansion=4,
                  beta=0, val_lambda=0.333, lr=1e-2, swa_freq=250):
         super(Network, self).__init__()
         self.save_hyperparameters()
@@ -84,6 +87,7 @@ class Network(pl.LightningModule):
             blocks=blocks, channels=channels, features=features,
             pre_act=pre_act, activation=activation,
             squeeze_excitation=squeeze_excitation,
+            bottleneck=bottleneck, bottleneck_expansion=bottleneck_expansion,
             radix=radix, groups=groups, bottleneck_width=bottleneck_width
         )
         self.swa_model = AveragedModel(self.net)
@@ -390,6 +394,8 @@ def main():
         model = Network(
             blocks=args.block, channels=args.ch, features=256,
             pre_act=args.pre_act, squeeze_excitation=args.se,
+            bottleneck=args.bottleneck,
+            bottleneck_expansion=args.bottleneck_expansion,
             swa_freq=args.swa_freq, radix=args.radix, groups=args.groups
         )
         if args.pretrained_model_path is not None:

@@ -69,6 +69,37 @@ class BasicBlock(nn.Module):
         return y
 
 
+class BottleneckBlock(nn.Module):
+    def __init__(self, channels, activation=nn.SiLU, expansion=4):
+        super(BottleneckBlock, self).__init__()
+        self.net = nn.Sequential(
+            nn.BatchNorm2d(num_features=channels),
+            activation(),
+            nn.Conv2d(
+                in_channels=channels, out_channels=channels // expansion,
+                kernel_size=1, padding=0, bias=False
+            ),
+            nn.BatchNorm2d(num_features=channels),
+            activation(),
+            nn.Conv2d(
+                in_channels=channels // expansion,
+                out_channels=channels // expansion,
+                kernel_size=3, padding=1, bias=False
+            ),
+            nn.BatchNorm2d(num_features=channels),
+            activation(),
+            nn.Conv2d(
+                in_channels=channels // expansion, out_channels=channels,
+                kernel_size=1, padding=0, bias=True
+            )
+        )
+
+    def forward(self, x):
+        h = self.net(x)
+        y = h + x
+        return y
+
+
 class BottleneckBlockNext(nn.Module):
     expansion = 4
 
