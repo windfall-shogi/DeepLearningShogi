@@ -5,7 +5,7 @@ from torch import nn
 
 from .entry import Entry
 from .residual_block import (BasicBlock, BottleneckBlockNext,
-                             BasicBlockFRN, BasicBlockSE)
+                             BasicBlockFRN, BasicBlockSE, BasicBlockDilationSE)
 
 __author__ = 'Yasuhiro'
 __date__ = '2021/02/14'
@@ -27,7 +27,7 @@ class NetworkBase(nn.Module):
         if squeeze_excitation:
             assert pre_act, "pre activation only!"
             self.blocks = nn.Sequential(*[
-                BasicBlockSE(channels=channels, activation=activation)
+                BasicBlockDilationSE(channels=channels, activation=activation)
                 for _ in range(blocks)
             ])
         else:

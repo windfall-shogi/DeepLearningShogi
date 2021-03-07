@@ -349,3 +349,38 @@ class BasicBlockFRNSE(nn.Module):
         h = self.se(h)
         y = h + x
         return y
+
+
+class BasicBlockDilationSE(nn.Module):
+    def __init__(self, channels, activation=nn.SiLU):
+        super(BasicBlockDilationSE, self).__init__()
+
+        self.net1 = nn.Sequential(
+            nn.BatchNorm2d(num_features=channels),
+            activation(),
+            nn.Conv2d(in_channels=channels, out_channels=channels,
+                      kernel_size=3, padding=1, bias=False),
+            nn.BatchNorm2d(num_features=channels),
+            activation(),
+            nn.Conv2d(in_channels=channels, out_channels=channels,
+                      kernel_size=3, padding=1),
+            SqueezeExcitation(channels=channels, ratio=16)
+        )
+
+        self.net2 = nn.Sequential(
+            nn.BatchNorm2d(num_features=channels),
+            activation(),
+            nn.Conv2d(in_channels=channels, out_channels=channels,
+                      kernel_size=3, padding=2, dilation=2, bias=False),
+            nn.BatchNorm2d(num_features=channels),
+            activation(),
+            nn.Conv2d(in_channels=channels, out_channels=channels,
+                      kernel_size=3, padding=2, dilation=2),
+            SqueezeExcitation(channels=channels, ratio=16)
+        )
+
+    def forward(self, x):
+        h1 = self.net1(x)
+        h2 = self.net2(x)
+        y = h1 + h1 + x
+        return y
