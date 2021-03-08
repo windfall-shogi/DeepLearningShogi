@@ -30,7 +30,7 @@ class NetworkBase(nn.Module):
         if squeeze_excitation:
             assert pre_act, "pre activation only!"
             self.blocks = nn.Sequential(*[
-                BasicBlockSE(channels=channels, activation=activation)
+                BasicBlockDilationSE(channels=channels, activation=activation)
                 for _ in range(blocks)
             ])
         else:

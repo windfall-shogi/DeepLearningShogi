@@ -413,5 +413,5 @@ class BasicBlockDilationSE(nn.Module):
     def forward(self, x):
         h1 = self.net1(x)
         h2 = self.net2(x)
-        y = h1 + h1 + x
+        y = h1 + h2 + x
         return y
