@@ -415,3 +415,26 @@ class BasicBlockDilationSE(nn.Module):
         h2 = self.net2(x)
         y = h1 + h2 + x
         return y
+
+
+class InvertedBottleneckBlock(nn.Module):
+    def __init__(self, channels, activation=nn.SiLU, expansion=4):
+        super(InvertedBottleneckBlock, self).__init__()
+        self.net = nn.Sequential(
+            nn.Conv2d(in_channels=channels, out_channels=channels * expansion,
+                      kernel_size=1, bias=False),
+            nn.BatchNorm2d(num_features=channels * expansion),
+            activation(),
+            nn.Conv2d(in_channels=channels * expansion,
+                      out_channels=channels * expansion,
+                      kernel_size=3, padding=1, bias=False),
+            nn.BatchNorm2d(num_features=channels * expansion),
+            activation(),
+            nn.Conv2d(in_channels=channels * expansion, out_channels=channels,
+                      kernel_size=1)
+        )
+
+    def forward(self, x):
+        h = self.net(x)
+        y = h + x
+        return y

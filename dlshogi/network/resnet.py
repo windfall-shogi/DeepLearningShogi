@@ -6,7 +6,7 @@ from torch import nn
 from .entry import Entry
 from .residual_block import (
     BasicBlock, BottleneckBlockNext, BasicBlockFRN, BasicBlockSE,
-    BasicBlockDilationSE, BottleneckBlock
+    BasicBlockDilationSE, BottleneckBlock, InvertedBottleneckBlock
 )
 
 __author__ = 'Yasuhiro'
@@ -30,14 +30,16 @@ class NetworkBase(nn.Module):
         if squeeze_excitation:
             assert pre_act, "pre activation only!"
             self.blocks = nn.Sequential(*[
-                BasicBlockDilationSE(channels=channels, activation=activation)
+                BasicBlockSE(channels=channels, activation=activation)
                 for _ in range(blocks)
             ])
         else:
             if bottleneck:
                 self.blocks = nn.Sequential(*[
-                    BottleneckBlock(channels=channels, activation=activation,
-                                    expansion=bottleneck_expansion)
+                    InvertedBottleneckBlock(
+                        channels=channels, activation=activation,
+                        expansion=bottleneck_expansion
+                    )
                     for _ in range(blocks)
                 ])
             else:
