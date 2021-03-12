@@ -6,7 +6,8 @@ from torch import nn
 from .entry import Entry
 from .residual_block import (
     BasicBlock, BottleneckBlockNext, BasicBlockFRN, BasicBlockSE,
-    BasicBlockDilationSE, BottleneckBlock, InvertedBottleneckBlock
+    BasicBlockDilationSE, BottleneckBlock, InvertedBottleneckBlock,
+    InvertedBottleneckBlockSD
 )
 
 __author__ = 'Yasuhiro'
@@ -95,4 +96,25 @@ class NetworkBaseNext(nn.Module):
 
     def forward(self, x):
         y = self.net(x)
+        return y
+
+
+class NetworkBaseStochasticDepth(nn.Module):
+    def __init__(self, blocks, channels, activation=nn.SiLU,
+                 bottleneck=True, bottleneck_expansion=4, **kwargs):
+        super(NetworkBaseStochasticDepth, self).__init__()
+        assert bottleneck
+
+        self.entry = Entry(out_channels=channels)
+        self.blocks = nn.Sequential(*[
+            InvertedBottleneckBlockSD(
+                channels=channels, activation=activation,
+                expansion=bottleneck_expansion, n=i, total=blocks
+            )
+            for i in range(blocks)
+        ])
+
+    def forward(self, x):
+        h = self.entry(x)
+        y = self.blocks(h)
         return y

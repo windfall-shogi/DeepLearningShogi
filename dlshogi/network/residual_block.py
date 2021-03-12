@@ -1,6 +1,7 @@
 #! /usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import numpy as np
 import torch
 import torch.nn.functional as F
 from torch import nn
@@ -437,4 +438,40 @@ class InvertedBottleneckBlock(nn.Module):
     def forward(self, x):
         h = self.net(x)
         y = h + x
+        return y
+
+
+class InvertedBottleneckBlockSD(nn.Module):
+    def __init__(self, channels, activation=nn.SiLU, expansion=4,
+                 n=None, total=None):
+        super(InvertedBottleneckBlockSD, self).__init__()
+        self.net = nn.Sequential(
+            nn.Conv2d(in_channels=channels, out_channels=channels * expansion,
+                      kernel_size=1, bias=False),
+            nn.BatchNorm2d(num_features=channels * expansion),
+            activation(),
+            nn.Conv2d(in_channels=channels * expansion,
+                      out_channels=channels * expansion,
+                      kernel_size=3, padding=1, bias=False),
+            nn.BatchNorm2d(num_features=channels * expansion),
+            activation(),
+            nn.Conv2d(in_channels=channels * expansion, out_channels=channels,
+                      kernel_size=1)
+        )
+
+        self.probability = 1 - n / (total - 1) * 0.5
+
+    def forward(self, x):
+        if self.training:
+            if np.random.rand() < self.probability:
+                self.net.requires_grad_(True)
+                h = self.net(x)
+                y = h + x
+            else:
+                self.net.requires_grad_(False)
+                y = x
+        else:
+            h = self.net(x) * self.probability
+            y = h + x
+
         return y
