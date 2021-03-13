@@ -368,6 +368,32 @@ def update_bn(loader, model, device=None):
     model.train(was_training)
 
 
+def find_lr(model, output_dir, train_data, test_data, device, args):
+    # なぜか同じTrainerで学習もしようとするとおかしくなる
+    trainer = pl.Trainer(
+        max_epochs=args.epoch, gpus=[0],
+        default_root_dir=str(output_dir),
+        precision=16 if args.use_amp else 32,
+        val_check_interval=args.eval_interval
+    )
+
+    train_loader = HCPEDataLoader(train_data, batch_size=args.batch_size,
+                                  shuffle=True, device=device)
+    val_loader = HCPEDataLoader(test_data[:args.batch_size * 10],
+                                batch_size=args.batch_size, device=device)
+
+    lr_finder = trainer.tuner.lr_find(
+        model=model, train_dataloader=train_loader, val_dataloaders=val_loader,
+        min_lr=1e-6, max_lr=0.8
+    )
+    # print(lr_finder.results)
+    fig = lr_finder.plot(suggest=True)
+    fig.savefig(str(output_dir / 'lr_suggestion.png'), bbox_inches='tight')
+
+    new_lr = lr_finder.suggestion()
+    return new_lr
+
+
 def main():
     args = parse_args()
 
@@ -414,18 +440,17 @@ def main():
         default_root_dir=str(output_dir),
         fast_dev_run=args.fast_dev_run,
         precision=16 if args.use_amp else 32,
-        val_check_interval=args.eval_interval
+        val_check_interval=args.eval_interval,
+        accumulate_grad_batches=4
     )
 
-    lr_finder = trainer.tuner.lr_find(
-        model=model, train_dataloader=train_loader, val_dataloaders=val_loader
+    new_lr = find_lr(
+        model=model, output_dir=output_dir,
+        train_data=train_data, test_data=test_data, device=device, args=args
     )
-    print(lr_finder.results)
-    fig = lr_finder.plot(suggest=True)
-    fig.savefig(str(output_dir / 'lr_suggestion.png'), bbox_inches='tight')
-
-    new_lr = lr_finder.suggestion()
+    print(new_lr)
     model.hparams.lr = new_lr
+    model.hparams.swa_lr = new_lr
 
     trainer.fit(model, train_dataloader=train_loader,
                 val_dataloaders=val_loader)
