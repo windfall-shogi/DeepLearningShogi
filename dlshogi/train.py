@@ -37,6 +37,7 @@ def parse_args():
     parser.add_argument('--pretrained_model_path', type=str)
     parser.add_argument('--epoch', type=int, default=1)
     parser.add_argument('--batch_size', type=int, default=100)
+    parser.add_argument('--accumulate_grad_batches', type=int, default=1)
     parser.add_argument('--eval_interval', type=int, default=1000,
                         help='frequency (steps) to check validation')
     parser.add_argument('--block', type=int, default=20)
@@ -384,7 +385,7 @@ def find_lr(model, output_dir, train_data, test_data, device, args):
 
     lr_finder = trainer.tuner.lr_find(
         model=model, train_dataloader=train_loader, val_dataloaders=val_loader,
-        min_lr=1e-6, max_lr=0.8
+        min_lr=1e-6, max_lr=1e-1
     )
     # print(lr_finder.results)
     fig = lr_finder.plot(suggest=True)
@@ -441,7 +442,7 @@ def main():
         fast_dev_run=args.fast_dev_run,
         precision=16 if args.use_amp else 32,
         val_check_interval=args.eval_interval,
-        accumulate_grad_batches=4
+        accumulate_grad_batches=args.accumulate_grad_batches
     )
 
     new_lr = find_lr(
@@ -465,6 +466,9 @@ def main():
     if isinstance(metrics, list):
         metrics = metrics[-1]
     with (output_dir / 'result.txt').open('w') as f:
+        f.write('learning rate: {}'.format(new_lr))
+        f.write('batch size: {}'.format(args.batch_size))
+
         for key, value in metrics.items():
             f.write('{}: {}\n'.format(key, value))
 
