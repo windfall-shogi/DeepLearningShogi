@@ -416,6 +416,17 @@ def main():
         precision=16 if args.use_amp else 32,
         val_check_interval=args.eval_interval
     )
+
+    lr_finder = trainer.tuner.lr_find(
+        model=model, train_dataloader=train_loader, val_dataloaders=val_loader
+    )
+    print(lr_finder.results)
+    fig = lr_finder.plot(suggest=True)
+    fig.savefig(str(output_dir / 'lr_suggestion.png'), bbox_inches='tight')
+
+    new_lr = lr_finder.suggestion()
+    model.hparams.lr = new_lr
+
     trainer.fit(model, train_dataloader=train_loader,
                 val_dataloaders=val_loader)
 
