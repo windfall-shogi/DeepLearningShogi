@@ -235,7 +235,7 @@ class HCPEDataset(Dataset):
 
     def __getitem__(self, idx):
         feature1 = np.empty((FEATURES1_NUM, 9, 9), dtype=np.float32)
-        feature2 = np.empty((FEATURES2_NUM, 9, 9), dtype=np.float32)
+        feature2 = np.empty((FEATURES2_NUM, 1, 1), dtype=np.float32)
         move = np.empty(1, dtype=np.int32)
         result = np.empty(1, dtype=np.float32)
         value = np.empty_like(result)
@@ -262,7 +262,7 @@ class HCPEDataLoader(DataLoader):
             pin_memory=True
         )
         self.torch_features2 = torch.empty(
-            (batch_size, FEATURES2_NUM, 9, 9), dtype=torch.float32,
+            (batch_size, FEATURES2_NUM, 1, 1), dtype=torch.float32,
             pin_memory=True
         )
         self.torch_move = torch.empty(
