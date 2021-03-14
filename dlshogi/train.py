@@ -51,6 +51,7 @@ def parse_args():
     parser.add_argument('--groups', type=int, default=1, help='cardinality')
     parser.add_argument('--bottleneck_width', type=int, default=64)
     parser.add_argument('--lr', type=float, default=1e-3)
+    parser.add_argument('--val_lambda', type=float, default=0.333)
     parser.add_argument('--swa_freq', type=int, default=250)
     parser.add_argument('--swa_n_avr', type=int, default=10)
     parser.add_argument('--swa_lr', type=float, default=1e-3)
@@ -423,7 +424,8 @@ def main():
             pre_act=args.pre_act, squeeze_excitation=args.se,
             bottleneck=args.bottleneck,
             bottleneck_expansion=args.bottleneck_expansion,
-            swa_freq=args.swa_freq, radix=args.radix, groups=args.groups
+            swa_freq=args.swa_freq, radix=args.radix, groups=args.groups,
+            val_lambda=args.val_lambda
         )
         if args.pretrained_model_path is not None:
             copy_pretrained_value(
