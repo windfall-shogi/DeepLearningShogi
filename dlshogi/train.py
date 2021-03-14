@@ -81,7 +81,7 @@ class Network(pl.LightningModule):
                  radix=1, groups=1, bottleneck_width=64,
                  activation=nn.SiLU, squeeze_excitation=False,
                  bottleneck=False, bottleneck_expansion=4,
-                 beta=0, val_lambda=0.333, lr=1e-2, swa_freq=250):
+                 beta=0, val_lambda=0.333, lr=1e-2, swa_lr=1e-2, swa_freq=250):
         super(Network, self).__init__()
         self.save_hyperparameters()
 
@@ -202,7 +202,7 @@ class Network(pl.LightningModule):
     # noinspection PyAttributeOutsideInit
     def configure_optimizers(self):
         optimizer = torch.optim.SGD(self.parameters(), lr=self.hparams.lr)
-        self.swa_scheduler = SWALR(optimizer, swa_lr=self.hparams.lr,
+        self.swa_scheduler = SWALR(optimizer, swa_lr=self.hparams.swa_lr,
                                    anneal_strategy='linear', anneal_epochs=10)
         return optimizer
 
@@ -417,6 +417,7 @@ def main():
         output_dir.mkdir(parents=True)
 
     if args.model_path is not None:
+        print('load from {}'.format(args.model_path))
         model = Network.load_from_checkpoint(args.model_path)
     else:
         model = Network(
@@ -425,7 +426,8 @@ def main():
             bottleneck=args.bottleneck,
             bottleneck_expansion=args.bottleneck_expansion,
             swa_freq=args.swa_freq, radix=args.radix, groups=args.groups,
-            val_lambda=args.val_lambda
+            val_lambda=args.val_lambda,
+            lr=args.lr, swa_lr=args.swa_lr
         )
         if args.pretrained_model_path is not None:
             copy_pretrained_value(
@@ -447,13 +449,14 @@ def main():
         accumulate_grad_batches=args.accumulate_grad_batches
     )
 
-    new_lr = find_lr(
-        model=model, output_dir=output_dir,
-        train_data=train_data, test_data=test_data, device=device, args=args
-    )
-    print(new_lr)
-    model.hparams.lr = new_lr
-    model.hparams.swa_lr = new_lr
+    new_lr = model.hparams.lr
+    # new_lr = find_lr(
+    #     model=model, output_dir=output_dir,
+    #     train_data=train_data, test_data=test_data, device=device, args=args
+    # )
+    # print(new_lr)
+    # model.hparams.lr = new_lr
+    # model.hparams.swa_lr = new_lr
 
     trainer.fit(model, train_dataloader=train_loader,
                 val_dataloaders=val_loader)
