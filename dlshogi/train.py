@@ -468,8 +468,8 @@ def main():
     if isinstance(metrics, list):
         metrics = metrics[-1]
     with (output_dir / 'result.txt').open('w') as f:
-        f.write('learning rate: {}'.format(new_lr))
-        f.write('batch size: {}'.format(args.batch_size))
+        f.write('learning rate: {}\n'.format(new_lr))
+        f.write('batch size: {}\n'.format(args.batch_size))
 
         for key, value in metrics.items():
             f.write('{}: {}\n'.format(key, value))
